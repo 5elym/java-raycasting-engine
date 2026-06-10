@@ -3,6 +3,10 @@ import java.awt.Canvas;
 import java.awt.Graphics;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
 import java.awt.Color;
 
 public class Engine extends Canvas implements Runnable {
@@ -11,6 +15,8 @@ public class Engine extends Canvas implements Runnable {
     private boolean running = false;
 
     private BufferedImage frameBuffer;
+
+    private List<List<Integer>> map = new ArrayList<List<Integer>>();
 
     public Engine() {
         // Setup the Window
@@ -66,7 +72,45 @@ public class Engine extends Canvas implements Runnable {
         // 4. Draw the vertical wall line using bufferGraphics.drawLine(...)
     }
 
+    private List<List<Integer>> getMapFromTextFile(String filePath) {
+        File file = new File(filePath);
+
+        map.add(new ArrayList<Integer>());
+        int firstIndex = 0;
+        int secondIndex = 0;
+        try (Scanner scanner = new Scanner(file)) {
+            scanner.useDelimiter("");
+            while (scanner.hasNext()) {
+                char character = scanner.next().charAt(0);
+
+                if (Character.isDigit(character)) {
+                    map.get(firstIndex).set(secondIndex, (int) character);
+                } else if (character == '\n') {
+                    secondIndex = 0;
+                    firstIndex++;
+                    scanner.nextLine();
+                    map.add(new ArrayList<Integer>());
+                } else {
+                    throw new IllegalArgumentException("Map file contains invalid characters!");
+                }
+
+            }
+
+        } catch (Exception e) {
+            System.out.printf("Error: No file found at %s", filePath);
+            e.printStackTrace();
+        }
+
+        return List.of(List.of(0));
+    }
+
     public synchronized void start() {
+        try {
+            map = getMapFromTextFile("map.txt");
+        } catch (IllegalArgumentException e) {
+            System.err.printf(e.getMessage());
+        }
+
         running = true;
         new Thread(this).start(); // Runs the game loop in a separate thread
     }
