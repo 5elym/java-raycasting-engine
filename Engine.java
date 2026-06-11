@@ -12,11 +12,14 @@ import java.awt.Color;
 public class Engine extends Canvas implements Runnable {
     private static final int WIDTH = 640;
     private static final int HEIGHT = 480;
+
     private boolean running = false;
+    private int mapWidth;
+    private int mapHeight;
 
     private BufferedImage frameBuffer;
 
-    private List<List<Integer>> map = new ArrayList<List<Integer>>();
+    private int[][] map;
 
     public Engine() {
         // Setup the Window
@@ -72,41 +75,64 @@ public class Engine extends Canvas implements Runnable {
         // 4. Draw the vertical wall line using bufferGraphics.drawLine(...)
     }
 
-    private List<List<Integer>> getMapFromTextFile(String filePath) {
+    private int[][] getMapFromTextFile(String filePath) throws IllegalArgumentException {
         File file = new File(filePath);
 
-        map.add(new ArrayList<Integer>());
         int firstIndex = 0;
         int secondIndex = 0;
+        int[][] newMap = null;
         try (Scanner scanner = new Scanner(file)) {
-            scanner.useDelimiter("");
-            while (scanner.hasNext()) {
-                char character = scanner.next().charAt(0);
+            // Get width and height of map from file
+            if (!scanner.next().equals("WIDTH"))
+                throw new IllegalArgumentException("WIDTH not specified in map file!");
+            mapWidth = scanner.nextInt();
+            System.out.printf("Map width: %d\n", mapWidth);
+            if (!scanner.next().equals("HEIGHT"))
+                throw new IllegalArgumentException("HEIGHT not specified in map file!");
+            mapHeight = scanner.nextInt();
+            System.out.printf("Map height: %d\n", mapHeight);
 
-                if (Character.isDigit(character)) {
-                    map.get(firstIndex).set(secondIndex, (int) character);
-                } else if (character == '\n') {
-                    secondIndex = 0;
-                    firstIndex++;
-                    scanner.nextLine();
-                    map.add(new ArrayList<Integer>());
-                } else {
-                    throw new IllegalArgumentException("Map file contains invalid characters!");
+            newMap = new int[mapHeight][mapWidth];
+
+            // Loop through each line
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine().trim();
+                if (line.isEmpty())
+                    continue;
+
+                // Loop through each character in the line
+                for (char character : line.toCharArray()) {
+                    if (Character.isDigit(character)) {
+                        newMap[firstIndex][secondIndex] = Character.getNumericValue(character);
+                    } else {
+                        throw new IllegalArgumentException("Map file contains invalid character: " + character);
+                    }
+                    secondIndex++;
                 }
-
+                firstIndex++;
+                secondIndex = 0;
             }
-
         } catch (Exception e) {
             System.out.printf("Error: No file found at %s", filePath);
             e.printStackTrace();
         }
 
-        return List.of(List.of(0));
+        return newMap;
+    }
+
+    private void printArray() {
+        for (int[] x : map) {
+            for (int y : x) {
+                System.out.print(y);
+            }
+            System.out.println();
+        }
     }
 
     public synchronized void start() {
         try {
             map = getMapFromTextFile("map.txt");
+            printArray();
         } catch (IllegalArgumentException e) {
             System.err.printf(e.getMessage());
         }
