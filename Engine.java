@@ -7,11 +7,12 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Vector;
 import java.awt.Color;
 
 public class Engine extends Canvas implements Runnable {
-    private static final int WIDTH = 640;
-    private static final int HEIGHT = 480;
+    private static final int SCREEN_WIDTH = 640;
+    private static final int SCREEN_HEIGHT = 480;
 
     private boolean running = false;
     private int mapWidth;
@@ -21,11 +22,21 @@ public class Engine extends Canvas implements Runnable {
 
     private int[][] map;
 
+    // Player position vector
+    Vector2D pos = new Vector2D(10, 10);
+    // Player direction vector
+    Vector2D dir = new Vector2D(1, 0);
+    // Camera plane vector
+    Vector2D plane = new Vector2D(0, 1);
+
+    double time = 0; // time of current frame
+    double oldTime = 0; // time of previous frame
+
     public Engine() {
         // Setup the Window
-        frameBuffer = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+        frameBuffer = new BufferedImage(SCREEN_WIDTH, SCREEN_HEIGHT, BufferedImage.TYPE_INT_RGB);
         JFrame frame = new JFrame("Java Raycaster");
-        frame.setSize(WIDTH, HEIGHT);
+        frame.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
         frame.add(this);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setResizable(false);
@@ -63,9 +74,9 @@ public class Engine extends Canvas implements Runnable {
         // Clear screen (draw floor and ceiling)
         Graphics bufferGraphics = frameBuffer.getGraphics();
         bufferGraphics.setColor(Color.DARK_GRAY); // Ceiling
-        bufferGraphics.fillRect(0, 0, WIDTH, HEIGHT / 2);
+        bufferGraphics.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT / 2);
         bufferGraphics.setColor(Color.GRAY); // Floor
-        bufferGraphics.fillRect(0, HEIGHT / 2, WIDTH, HEIGHT / 2);
+        bufferGraphics.fillRect(0, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2);
 
         // Raycasting logic
         // For each vertical stripe (x) on the screen:
@@ -73,6 +84,40 @@ public class Engine extends Canvas implements Runnable {
         // 2. Find distance to wall
         // 3. Calculate vertical wall height
         // 4. Draw the vertical wall line using bufferGraphics.drawLine(...)
+
+        for (int x = 0; x < SCREEN_WIDTH; x++) {
+            // Calculate ray direction for each x in the screen
+            double cameraX = 2 * (x / (double) SCREEN_WIDTH) - 1;
+            Vector2D rayDir = new Vector2D(dir.x + plane.x * cameraX, dir.y + plane.y * cameraX);
+            // Coordinate each grid square in the map
+            Vector2D mapGrid = new Vector2D((int) pos.x, (int) pos.y);
+            // Length of ray to the next boundary from current pos
+            Vector2D sideDist = new Vector2D(0, 0);
+            // Length of ray to the next boundary from currnet x and y
+            Vector2D deltaDist = new Vector2D(Math.abs(1 / rayDir.x), Math.abs(1 / rayDir.y));
+            // Step direction
+            Vector2D step = new Vector2D(0, 0);
+
+            boolean isHit; // If a wall was hit
+            int side; // x-side = 0, y-side = 1
+
+            // Get step direction and initial distance to a boundary
+            if (rayDir.x > 0) {
+                step.x = 1;
+                sideDist.x = ((mapGrid.x + 1.0) - pos.x) * deltaDist.x;
+            } else {
+                step.x = -1;
+                sideDist.x = (pos.x - mapGrid.x) * deltaDist.x;
+            }
+            if (rayDir.y > 0) {
+                step.y = 1;
+                sideDist.y = ((mapGrid.y + 1.0) - pos.y) * deltaDist.y;
+            } else {
+                step.y = -1;
+                sideDist.y = (pos.y - mapGrid.y) * deltaDist.y;
+            }
+
+        }
     }
 
     private int[][] getMapFromTextFile(String filePath) throws IllegalArgumentException {
