@@ -1,6 +1,9 @@
 import javax.swing.JFrame;
 import java.awt.Canvas;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -23,7 +26,7 @@ public class Engine extends Canvas implements Runnable {
     private int[][] map;
 
     // Player position vector
-    Vector2D pos = new Vector2D(10, 10);
+    Vector2D pos = new Vector2D(1.5, 1.5);
     // Player direction vector
     Vector2D dir = new Vector2D(1, 0);
     // Camera plane vector
@@ -49,6 +52,9 @@ public class Engine extends Canvas implements Runnable {
         createBufferStrategy(2);
         BufferStrategy bs = getBufferStrategy();
 
+        dir.rotate(1);
+        plane.rotate(1);
+
         while (running) {
             // Player logic
             updatePlayerState();
@@ -68,15 +74,18 @@ public class Engine extends Canvas implements Runnable {
 
     private void updatePlayerState() {
         // Read keyboard input and update playerX, playerY, and playerAngle
+
     }
 
     private void renderToBuffer() {
         // Clear screen (draw floor and ceiling)
-        Graphics bufferGraphics = frameBuffer.getGraphics();
-        bufferGraphics.setColor(Color.DARK_GRAY); // Ceiling
+        Graphics2D bufferGraphics = (Graphics2D) frameBuffer.getGraphics();
+        bufferGraphics.setColor(Color.DARK_GRAY);
         bufferGraphics.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT / 2);
-        bufferGraphics.setColor(Color.GRAY); // Floor
+        bufferGraphics.setColor(Color.GRAY);
         bufferGraphics.fillRect(0, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2);
+
+        bufferGraphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         // Raycasting logic
         // For each vertical stripe (x) on the screen:
@@ -98,8 +107,8 @@ public class Engine extends Canvas implements Runnable {
             // Step direction
             Vector2D step = new Vector2D(0, 0);
 
-            boolean isHit; // If a wall was hit
-            int side; // x-side = 0, y-side = 1
+            boolean isHit = false; // If a wall was hit
+            int side = 0; // x-side = 0, y-side = 1
 
             // Get step direction and initial distance to a boundary
             if (rayDir.x > 0) {
@@ -117,6 +126,39 @@ public class Engine extends Canvas implements Runnable {
                 sideDist.y = (pos.y - mapGrid.y) * deltaDist.y;
             }
 
+            // Main DDA algorith,
+            while (!isHit) {
+                // Check which boundary was met first
+                if (sideDist.x < sideDist.y) {
+                    sideDist.x += deltaDist.x;
+                    mapGrid.x += step.x;
+                    side = 0;
+                } else {
+                    sideDist.y += deltaDist.y;
+                    mapGrid.y += step.y;
+                    side = 1;
+                }
+
+                if (mapGrid.x < 0 || mapGrid.x >= mapWidth || mapGrid.y < 0 || mapGrid.y >= mapHeight) {
+                    break;
+                }
+
+                // Check if wall was hit
+                isHit = map[(int) mapGrid.y][(int) mapGrid.x] > 0;
+            }
+
+            // Calulate perpendicular distance to wall from camera plane
+            double dist;
+            if (side == 0) {
+                dist = sideDist.x - deltaDist.x;
+                bufferGraphics.setColor(Color.WHITE); // Floor
+            } else {
+                dist = sideDist.y - deltaDist.y;
+                bufferGraphics.setColor(Color.lightGray); // Floor
+            }
+            double lineHeight = SCREEN_HEIGHT / dist;
+            Rectangle2D.Double line = new Rectangle2D.Double(x, SCREEN_HEIGHT / 2 - lineHeight / 2, 1, lineHeight);
+            bufferGraphics.fill(line);
         }
     }
 
