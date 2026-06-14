@@ -18,7 +18,7 @@ HEIGHT 5
 00111
 ```
 
-The engine uses the [Digital Differential Analyzer (DDA)](<https://en.wikipedia.org/wiki/Digital*differential_analyzer*(graphics_algorithm)>) algorithm for raycasting and is written in Java using JFrame as the graphics library.
+The engine uses the [Digital Differential Analyzer (DDA)](https://en.wikipedia.org/wiki/Digital_differential_analyzer_(graphics_algorithm)) algorithm for raycasting and is written in Java using JFrame as the graphics library.
 
 # Potential Improvements
 
