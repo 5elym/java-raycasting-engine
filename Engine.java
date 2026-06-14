@@ -7,15 +7,15 @@ import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferStrategy;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOError;
 import java.util.Scanner;
-import java.util.Vector;
 import java.awt.Color;
 
 public class Engine extends Canvas implements Runnable {
     private static final int SCREEN_WIDTH = 640;
     private static final int SCREEN_HEIGHT = 480;
+    private final double MOVE_SPEED = 1.0;
+    private final double ROTATION_SPEED = 1.5;
 
     private boolean running = false;
     private int mapWidth;
@@ -26,14 +26,15 @@ public class Engine extends Canvas implements Runnable {
     private int[][] map;
 
     // Player position vector
-    Vector2D pos = new Vector2D(1.5, 1.5);
+    private Vector2D pos = new Vector2D(1.5, 1.5);
     // Player direction vector
-    Vector2D dir = new Vector2D(1, 0);
+    private Vector2D dir = new Vector2D(1, 0);
     // Camera plane vector
-    Vector2D plane = new Vector2D(0, 1);
+    private Vector2D plane = new Vector2D(0, 1);
 
-    double time = 0; // time of current frame
-    double oldTime = 0; // time of previous frame
+    private double time = 0; // time of current frame
+    private double oldTime = 0; // time of previous frame
+    private InputHandler inputHandler;
 
     public Engine() {
         // Setup the Window
@@ -44,6 +45,9 @@ public class Engine extends Canvas implements Runnable {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setResizable(false);
         frame.setVisible(true);
+        inputHandler = new InputHandler();
+        this.addKeyListener(inputHandler);
+        this.requestFocus();
     }
 
     // Main loop
@@ -56,8 +60,12 @@ public class Engine extends Canvas implements Runnable {
         plane.rotate(1);
 
         while (running) {
+            oldTime = time;
+            time = System.nanoTime() / 1e9; // Convert nanoseconds to seconds
+            double deltaTime = time - oldTime;
+
             // Player logic
-            updatePlayerState();
+            updatePlayerState(deltaTime);
 
             // Raycasting and rendering logic
             renderToBuffer();
@@ -72,9 +80,23 @@ public class Engine extends Canvas implements Runnable {
         }
     }
 
-    private void updatePlayerState() {
-        // Read keyboard input and update playerX, playerY, and playerAngle
-
+    private void updatePlayerState(double dt) {
+        if (inputHandler.getForward()) {
+            pos.x += dir.x * MOVE_SPEED * dt;
+            pos.y += dir.y * MOVE_SPEED * dt;
+        }
+        if (inputHandler.getBackward()) {
+            pos.x -= dir.x * MOVE_SPEED * dt;
+            pos.y -= dir.y * MOVE_SPEED * dt;
+        }
+        if (inputHandler.getLeft()) {
+            dir.rotate(-ROTATION_SPEED * dt);
+            plane.rotate(-ROTATION_SPEED * dt);
+        }
+        if (inputHandler.getRight()) {
+            dir.rotate(ROTATION_SPEED * dt);
+            plane.rotate(ROTATION_SPEED * dt);
+        }
     }
 
     private void renderToBuffer() {
@@ -84,15 +106,7 @@ public class Engine extends Canvas implements Runnable {
         bufferGraphics.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT / 2);
         bufferGraphics.setColor(Color.GRAY);
         bufferGraphics.fillRect(0, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2);
-
         bufferGraphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        // Raycasting logic
-        // For each vertical stripe (x) on the screen:
-        // 1. Cast a ray
-        // 2. Find distance to wall
-        // 3. Calculate vertical wall height
-        // 4. Draw the vertical wall line using bufferGraphics.drawLine(...)
 
         for (int x = 0; x < SCREEN_WIDTH; x++) {
             // Calculate ray direction for each x in the screen
@@ -157,7 +171,14 @@ public class Engine extends Canvas implements Runnable {
                 bufferGraphics.setColor(Color.lightGray); // Floor
             }
             double lineHeight = SCREEN_HEIGHT / dist;
-            Rectangle2D.Double line = new Rectangle2D.Double(x, SCREEN_HEIGHT / 2 - lineHeight / 2, 1, lineHeight);
+
+            // Clamp values
+            double drawStart = SCREEN_HEIGHT / 2 - lineHeight / 2;
+            double drawEnd = SCREEN_HEIGHT / 2 + lineHeight / 2;
+            drawStart = Math.clamp(drawStart, 0, SCREEN_HEIGHT - 1);
+            drawEnd = Math.clamp(drawEnd, 0, SCREEN_HEIGHT - 1);
+
+            Rectangle2D.Double line = new Rectangle2D.Double(x, drawStart, 1, drawEnd - drawStart);
             bufferGraphics.fill(line);
         }
     }
@@ -199,9 +220,15 @@ public class Engine extends Canvas implements Runnable {
                 firstIndex++;
                 secondIndex = 0;
             }
-        } catch (Exception e) {
-            System.out.printf("Error: No file found at %s", filePath);
+        } catch (IllegalArgumentException e) {
+            System.err.println(e.getMessage());
+            System.err.println("Check " + filePath + " for errors.");
             e.printStackTrace();
+            System.exit(1);
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
         }
 
         return newMap;
@@ -217,12 +244,8 @@ public class Engine extends Canvas implements Runnable {
     }
 
     public synchronized void start() {
-        try {
-            map = getMapFromTextFile("map.txt");
-            printArray();
-        } catch (IllegalArgumentException e) {
-            System.err.printf(e.getMessage());
-        }
+        map = getMapFromTextFile("map.txt");
+        printArray();
 
         running = true;
         new Thread(this).start(); // Runs the game loop in a separate thread
